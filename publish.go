@@ -30,7 +30,7 @@ func WithPublishQoS(qos QoS) PublishOption {
 		case QoS2:
 			pk.Flags |= PublishQoS2
 		default:
-			panic(fmt.Sprintf("unknown QoS level %d", qos))
+			panic(fmt.Sprintf("unknown QoS level: %d", qos))
 		}
 	}
 }

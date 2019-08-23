@@ -43,7 +43,7 @@ func (d *Decoder) Decode() (IncomingPacket, error) {
 	case pkPingresp:
 		pk = &Pingresp{Flags: Flags(h)}
 	default:
-		return nil, fmt.Errorf("unknown packet type %d", uint8(h>>4))
+		return nil, fmt.Errorf("unknown packet type 0x%x", h>>4)
 	}
 	if err = pk.decode(d.dec); err != nil {
 		return nil, err
@@ -127,7 +127,7 @@ func (d *decoder) String() (string, error) {
 
 func (d *decoder) checkAvailableBytes(n int) error {
 	if d.len < n {
-		return errors.New("malformed packet")
+		return fmt.Errorf("malformed packet, len=%d want=%d", d.len, n)
 	}
 	return nil
 }
@@ -137,9 +137,6 @@ func (d *decoder) readLenAndGrow() error {
 	size, err := d.readLen()
 	if err != nil {
 		return err
-	}
-	if size == 0 {
-		return errors.New("malformed packet")
 	}
 	d.len = size
 	return d.buf.Grow(size)

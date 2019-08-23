@@ -34,7 +34,7 @@ func (rc ConnectReturnCode) String() string {
 	case ConnectionNotAuthorized:
 		return "not authorized"
 	default:
-		return ""
+		return fmt.Sprintf("unknown(%d)", rc)
 	}
 }
 

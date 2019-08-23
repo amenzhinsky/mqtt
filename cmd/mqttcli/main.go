@@ -1,12 +1,13 @@
 package main
 
 import (
-	"errors"
+	"context"
 	"flag"
 	"fmt"
 	"log"
 	"net"
 	"os"
+	"os/signal"
 	"path/filepath"
 
 	"github.com/amenzhinsky/mqtt"
@@ -59,24 +60,38 @@ Common Flags:
 }
 
 func run() error {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	sigc := make(chan os.Signal, 1)
+	signal.Notify(sigc, os.Interrupt)
+	go func() {
+		<-sigc
+		cancel()
+		<-sigc
+		os.Exit(1)
+	}()
+
 	switch flag.Arg(0) {
 	case "pub":
-		return pub(connect, flag.Args()[1:])
+		return pub(ctx, connect, flag.Args()[1:])
 	case "sub":
-		return sub(connect, flag.Args()[1:])
+		return sub(ctx, connect, flag.Args()[1:])
 	default:
 		return fmt.Errorf("unknown command %q", flag.Arg(0))
 	}
 }
 
-func connect() (*mqtt.Client, error) {
+func connect(ctx context.Context, opts ...mqtt.Option) (*mqtt.Client, error) {
 	conn, err := net.Dial("tcp", addrFlag)
 	if err != nil {
 		return nil, err
 	}
-	c := mqtt.NewClient(conn, mqtt.WithLogger(log.New(os.Stderr, "", 0)))
+	c := mqtt.NewClient(conn, append([]mqtt.Option{
+		mqtt.WithWarnLogger(log.New(os.Stderr, "W ", 0)),
+		mqtt.WithDebugLogger(log.New(os.Stderr, "D ", 0)),
+	}, opts...)...)
 
-	opts := []mqtt.ConnectOption{
+	copts := []mqtt.ConnectOption{
 		mqtt.WithConnectCleanSession(cleanSessionFlag),
 		mqtt.WithConnectClientID(clientIDFlag),
 		mqtt.WithConnectUsername(usernameFlag),
@@ -84,28 +99,19 @@ func connect() (*mqtt.Client, error) {
 		mqtt.WithConnectKeepAlive(uint16(keepAliveFlag)),
 	}
 	if willTopicFlag != "" {
-		opts = append(opts, mqtt.WithConnectWill(
+		copts = append(copts, mqtt.WithConnectWill(
 			willTopicFlag, []byte(willPayloadFlag), mqtt.QoS(willQoSFlag), willRetainFlag,
 		))
 	}
-	if err = c.Send(mqtt.NewConnectPacket(opts...)); err != nil {
+	if _, err = c.Connect(ctx, mqtt.NewConnectPacket(copts...)); err != nil {
 		return nil, err
-	}
-	pk, err := c.Recv()
-	if err != nil {
-		return nil, err
-	}
-	connack, ok := pk.(*mqtt.Connack)
-	if !ok {
-		return nil, fmt.Errorf("expected CONNACK packet, got %s", pk.String())
-	}
-	if connack.ReturnCode != mqtt.ConnectionAccepted {
-		return nil, errors.New(connack.ReturnCode.String())
 	}
 	return c, nil
 }
 
-func pub(connect func() (*mqtt.Client, error), argv []string) error {
+type connectFunc func(ctx context.Context, opts ...mqtt.Option) (*mqtt.Client, error)
+
+func pub(ctx context.Context, connect connectFunc, argv []string) error {
 	var (
 		qosFlag      uint
 		retainFlag   bool
@@ -138,13 +144,13 @@ Flags:
 		os.Exit(2)
 	}
 
-	c, err := connect()
+	c, err := connect(ctx)
 	if err != nil {
 		return err
 	}
 	defer c.Close()
 
-	if err := c.Send(mqtt.NewPublishPacket(fset.Arg(0),
+	if err := c.Publish(ctx, mqtt.NewPublishPacket(fset.Arg(0),
 		mqtt.WithPublishPayload(payload),
 		mqtt.WithPublishQoS(mqtt.QoS(qosFlag)),
 		mqtt.WithPublishRetain(retainFlag),
@@ -152,57 +158,10 @@ Flags:
 	)); err != nil {
 		return err
 	}
-
-	switch qosFlag {
-	case mqtt.QoS1:
-		pk, err := c.Recv()
-		if err != nil {
-			return err
-		}
-		puback, ok := pk.(*mqtt.Puback)
-		if !ok {
-			return fmt.Errorf("expected PUBACK packet, got %s", pk.String())
-		}
-		if puback.PacketID != uint16(packetIDFlag) {
-			return fmt.Errorf("unexpected PUBACK id %d, want %d", puback.PacketID, uint16(packetIDFlag))
-		}
-	case mqtt.QoS2:
-		pk, err := c.Recv()
-		if err != nil {
-			return err
-		}
-
-		// part 1
-		pubrec, ok := pk.(*mqtt.Pubrec)
-		if !ok {
-			return fmt.Errorf("expected PUBREC packet, got %s", pk.String())
-		}
-		if pubrec.PacketID != uint16(packetIDFlag) {
-			return fmt.Errorf("unexpected PUBREC id %d, want %d", pubrec.PacketID, uint16(packetIDFlag))
-		}
-
-		// part 2
-		if err = c.Send(mqtt.NewPubrelPacket(uint16(packetIDFlag))); err != nil {
-			return err
-		}
-
-		// part 3
-		pk, err = c.Recv()
-		if err != nil {
-			return err
-		}
-		pubcomp, ok := pk.(*mqtt.Pubcomp)
-		if !ok {
-			return fmt.Errorf("expected PUBCOMP packet, got %s", pk.String())
-		}
-		if pubcomp.PacketID != uint16(packetIDFlag) {
-			return fmt.Errorf("unexpected PUBCOMP id %d, want %d", pubcomp.PacketID, uint16(packetIDFlag))
-		}
-	}
-	return c.Send(mqtt.NewDisconnectPacket())
+	return c.Disconnect(ctx)
 }
 
-func sub(connect func() (*mqtt.Client, error), argv []string) error {
+func sub(ctx context.Context, connect connectFunc, argv []string) error {
 	var (
 		qosFlag      uint
 		packetIDFlag uint
@@ -212,8 +171,8 @@ func sub(connect func() (*mqtt.Client, error), argv []string) error {
 	fset.Usage = func() {
 		fmt.Fprintf(os.Stderr, `Usage: %s [common flags...] sub [flags...] TOPIC...
 
-Flags:
-`, filepath.Base(os.Args[0]))
+	Flags:
+	`, filepath.Base(os.Args[0]))
 		fset.PrintDefaults()
 		fmt.Fprintf(os.Stderr, "\nCommon Flags:\n")
 		flag.PrintDefaults()
@@ -226,7 +185,9 @@ Flags:
 		os.Exit(2)
 	}
 
-	c, err := connect()
+	c, err := connect(ctx, mqtt.WithHandler(func(publish *mqtt.Publish) {
+		fmt.Printf("%s %s\n", publish.Topic, string(publish.Payload))
+	}))
 	if err != nil {
 		return err
 	}
@@ -237,31 +198,10 @@ Flags:
 	for _, topic := range fset.Args() {
 		opts = append(opts, mqtt.WithSubscribeTopic(topic, mqtt.QoS(qosFlag)))
 	}
-	if err = c.Send(mqtt.NewSubscribePacket(opts...)); err != nil {
+	if _, err = c.Subscribe(ctx, mqtt.NewSubscribePacket(opts...)); err != nil {
 		return err
 	}
 
-	pk, err := c.Recv()
-	if err != nil {
-		return err
-	}
-	connack, ok := pk.(*mqtt.Suback)
-	if !ok {
-		return fmt.Errorf("expected SUBACK packet, got %s", pk.String())
-	}
-	_ = connack
-
-	for {
-		pk, err := c.Recv()
-		if err != nil {
-			return err
-		}
-		publish, ok := pk.(*mqtt.Publish)
-		if !ok {
-			return fmt.Errorf("expected PUBLISH packet, got %s", pk.String())
-		}
-		fmt.Printf("%s %s\n", publish.Topic, publish.Payload)
-	}
-
-	return c.Send(mqtt.NewDisconnectPacket())
+	<-ctx.Done()
+	return c.Disconnect(context.Background())
 }
