@@ -4,6 +4,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"log"
 	"net"
 	"os"
 	"path/filepath"
@@ -73,7 +74,7 @@ func connect() (*mqtt.Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	c := mqtt.NewClient(conn)
+	c := mqtt.NewClient(conn, mqtt.WithLogger(log.New(os.Stderr, "", 0)))
 
 	opts := []mqtt.ConnectOption{
 		mqtt.WithConnectCleanSession(cleanSessionFlag),

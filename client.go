@@ -29,7 +29,11 @@ type Client struct {
 	e *Encoder
 	d *Decoder
 	c io.Closer
-	l *log.Logger
+	l Logger
+}
+
+type Logger interface {
+	Print(v ...interface{})
 }
 
 func (c *Client) Send(pk OutgoingPacket) error {
@@ -37,7 +41,7 @@ func (c *Client) Send(pk OutgoingPacket) error {
 		return err
 	}
 	if c.l != nil {
-		c.l.Print(">", pk.String())
+		c.l.Print("> ", pk.String())
 	}
 	return nil
 }
@@ -48,7 +52,7 @@ func (c *Client) Recv() (IncomingPacket, error) {
 		return nil, err
 	}
 	if c.l != nil {
-		c.l.Print("<", pk.String())
+		c.l.Print("< ", pk.String())
 	}
 	return pk, nil
 }
