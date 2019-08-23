@@ -1,5 +1,4 @@
-
-get:
+fuzzget:
 	go get -u github.com/dvyukov/go-fuzz/{go-fuzz,go-fuzz-build}
 
 fuzz:

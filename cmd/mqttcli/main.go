@@ -68,12 +68,12 @@ func run() error {
 	}
 }
 
-func connect() (*client, error) {
+func connect() (*mqtt.Client, error) {
 	conn, err := net.Dial("tcp", addrFlag)
 	if err != nil {
 		return nil, err
 	}
-	c := newClient(conn)
+	c := mqtt.NewClient(conn)
 
 	opts := []mqtt.ConnectOption{
 		mqtt.WithConnectCleanSession(cleanSessionFlag),
@@ -87,10 +87,10 @@ func connect() (*client, error) {
 			willTopicFlag, []byte(willPayloadFlag), mqtt.QoS(willQoSFlag), willRetainFlag,
 		))
 	}
-	if err = c.send(mqtt.NewConnectPacket(opts...)); err != nil {
+	if err = c.Send(mqtt.NewConnectPacket(opts...)); err != nil {
 		return nil, err
 	}
-	pk, err := c.recv()
+	pk, err := c.Recv()
 	if err != nil {
 		return nil, err
 	}
@@ -104,7 +104,7 @@ func connect() (*client, error) {
 	return c, nil
 }
 
-func pub(connect func() (*client, error), argv []string) error {
+func pub(connect func() (*mqtt.Client, error), argv []string) error {
 	var (
 		qosFlag      uint
 		retainFlag   bool
@@ -141,9 +141,9 @@ Flags:
 	if err != nil {
 		return err
 	}
-	defer c.close()
+	defer c.Close()
 
-	if err := c.send(mqtt.NewPublishPacket(fset.Arg(0),
+	if err := c.Send(mqtt.NewPublishPacket(fset.Arg(0),
 		mqtt.WithPublishPayload(payload),
 		mqtt.WithPublishQoS(mqtt.QoS(qosFlag)),
 		mqtt.WithPublishRetain(retainFlag),
@@ -154,7 +154,7 @@ Flags:
 
 	switch qosFlag {
 	case mqtt.QoS1:
-		pk, err := c.recv()
+		pk, err := c.Recv()
 		if err != nil {
 			return err
 		}
@@ -166,7 +166,7 @@ Flags:
 			return fmt.Errorf("unexpected PUBACK id %d, want %d", puback.PacketID, uint16(packetIDFlag))
 		}
 	case mqtt.QoS2:
-		pk, err := c.recv()
+		pk, err := c.Recv()
 		if err != nil {
 			return err
 		}
@@ -181,12 +181,12 @@ Flags:
 		}
 
 		// part 2
-		if err = c.send(mqtt.NewPubrelPacket(uint16(packetIDFlag))); err != nil {
+		if err = c.Send(mqtt.NewPubrelPacket(uint16(packetIDFlag))); err != nil {
 			return err
 		}
 
 		// part 3
-		pk, err = c.recv()
+		pk, err = c.Recv()
 		if err != nil {
 			return err
 		}
@@ -198,10 +198,10 @@ Flags:
 			return fmt.Errorf("unexpected PUBCOMP id %d, want %d", pubcomp.PacketID, uint16(packetIDFlag))
 		}
 	}
-	return c.send(mqtt.NewDisconnectPacket())
+	return c.Send(mqtt.NewDisconnectPacket())
 }
 
-func sub(connect func() (*client, error), argv []string) error {
+func sub(connect func() (*mqtt.Client, error), argv []string) error {
 	var (
 		qosFlag      uint
 		packetIDFlag uint
@@ -229,18 +229,18 @@ Flags:
 	if err != nil {
 		return err
 	}
-	defer c.close()
+	defer c.Close()
 
 	opts := make([]mqtt.SubscribeOption, 0, fset.NArg()+1)
 	opts = append(opts, mqtt.WithSubscribePacketID(uint16(packetIDFlag)))
 	for _, topic := range fset.Args() {
 		opts = append(opts, mqtt.WithSubscribeTopic(topic, mqtt.QoS(qosFlag)))
 	}
-	if err = c.send(mqtt.NewSubscribePacket(opts...)); err != nil {
+	if err = c.Send(mqtt.NewSubscribePacket(opts...)); err != nil {
 		return err
 	}
 
-	pk, err := c.recv()
+	pk, err := c.Recv()
 	if err != nil {
 		return err
 	}
@@ -251,7 +251,7 @@ Flags:
 	_ = connack
 
 	for {
-		pk, err := c.recv()
+		pk, err := c.Recv()
 		if err != nil {
 			return err
 		}
@@ -262,44 +262,5 @@ Flags:
 		fmt.Printf("%s %s\n", publish.Topic, publish.Payload)
 	}
 
-	return c.send(mqtt.NewDisconnectPacket())
-}
-
-func newClient(conn net.Conn) *client {
-	return &client{
-		enc:  mqtt.NewEncoder(conn),
-		dec:  mqtt.NewDecoder(conn),
-		conn: conn,
-	}
-}
-
-type client struct {
-	enc  *mqtt.Encoder
-	dec  *mqtt.Decoder
-	conn net.Conn
-}
-
-func (c *client) send(pk mqtt.OutgoingPacket) error {
-	if err := c.enc.Encode(pk); err != nil {
-		return err
-	}
-	if debugFlag {
-		fmt.Println(">", pk.String())
-	}
-	return nil
-}
-
-func (c *client) recv() (mqtt.IncomingPacket, error) {
-	pk, err := c.dec.Decode()
-	if err != nil {
-		return nil, err
-	}
-	if debugFlag {
-		fmt.Println("<", pk.String())
-	}
-	return pk, nil
-}
-
-func (c *client) close() error {
-	return c.conn.Close()
+	return c.Send(mqtt.NewDisconnectPacket())
 }
