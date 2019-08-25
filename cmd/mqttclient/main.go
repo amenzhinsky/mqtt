@@ -87,7 +87,7 @@ func connect(ctx context.Context, opts ...mqtt.Option) (*mqtt.Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	c := mqtt.NewClient(conn, append([]mqtt.Option{
+	c := mqtt.New(conn, append([]mqtt.Option{
 		mqtt.WithWarnLogger(log.New(os.Stderr, "W ", 0)),
 		mqtt.WithDebugLogger(log.New(os.Stderr, "D ", 0)),
 	}, opts...)...)
