@@ -1,4 +1,4 @@
-package mqtt
+package packet
 
 import (
 	"io/ioutil"
@@ -7,7 +7,7 @@ import (
 
 func BenchmarkEncoder_Encode(b *testing.B) {
 	e := NewEncoder(ioutil.Discard)
-	p := NewConnectPacket(
+	p := NewConnect(
 		WithConnectClientID("admin"),
 		WithConnectUsername("admin"),
 		WithConnectPassword("admin"),

@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 
 	"github.com/amenzhinsky/mqtt"
+	"github.com/amenzhinsky/mqtt/packet"
 )
 
 var (
@@ -91,19 +92,19 @@ func connect(ctx context.Context, opts ...mqtt.Option) (*mqtt.Client, error) {
 		mqtt.WithDebugLogger(log.New(os.Stderr, "D ", 0)),
 	}, opts...)...)
 
-	copts := []mqtt.ConnectOption{
-		mqtt.WithConnectCleanSession(cleanSessionFlag),
-		mqtt.WithConnectClientID(clientIDFlag),
-		mqtt.WithConnectUsername(usernameFlag),
-		mqtt.WithConnectPassword(passwordFlag),
-		mqtt.WithConnectKeepAlive(uint16(keepAliveFlag)),
+	copts := []packet.ConnectOption{
+		packet.WithConnectCleanSession(cleanSessionFlag),
+		packet.WithConnectClientID(clientIDFlag),
+		packet.WithConnectUsername(usernameFlag),
+		packet.WithConnectPassword(passwordFlag),
+		packet.WithConnectKeepAlive(uint16(keepAliveFlag)),
 	}
 	if willTopicFlag != "" {
-		copts = append(copts, mqtt.WithConnectWill(
-			willTopicFlag, []byte(willPayloadFlag), mqtt.QoS(willQoSFlag), willRetainFlag,
+		copts = append(copts, packet.WithConnectWill(
+			willTopicFlag, []byte(willPayloadFlag), packet.QoS(willQoSFlag), willRetainFlag,
 		))
 	}
-	if _, err = c.Connect(ctx, mqtt.NewConnectPacket(copts...)); err != nil {
+	if _, err = c.Connect(ctx, packet.NewConnect(copts...)); err != nil {
 		return nil, err
 	}
 	return c, nil
@@ -150,11 +151,11 @@ Flags:
 	}
 	defer c.Close()
 
-	if err := c.Publish(ctx, mqtt.NewPublishPacket(fset.Arg(0),
-		mqtt.WithPublishPayload(payload),
-		mqtt.WithPublishQoS(mqtt.QoS(qosFlag)),
-		mqtt.WithPublishRetain(retainFlag),
-		mqtt.WithPublishPacketID(uint16(packetIDFlag)),
+	if err := c.Publish(ctx, packet.NewPublish(fset.Arg(0),
+		packet.WithPublishPayload(payload),
+		packet.WithPublishQoS(packet.QoS(qosFlag)),
+		packet.WithPublishRetain(retainFlag),
+		packet.WithPublishPacketID(uint16(packetIDFlag)),
 	)); err != nil {
 		return err
 	}
@@ -185,7 +186,7 @@ func sub(ctx context.Context, connect connectFunc, argv []string) error {
 		os.Exit(2)
 	}
 
-	c, err := connect(ctx, mqtt.WithHandler(func(publish *mqtt.Publish) {
+	c, err := connect(ctx, mqtt.WithHandler(func(publish *packet.Publish) {
 		fmt.Printf("%s %s\n", publish.Topic, string(publish.Payload))
 	}))
 	if err != nil {
@@ -193,12 +194,12 @@ func sub(ctx context.Context, connect connectFunc, argv []string) error {
 	}
 	defer c.Close()
 
-	opts := make([]mqtt.SubscribeOption, 0, fset.NArg()+1)
-	opts = append(opts, mqtt.WithSubscribePacketID(uint16(packetIDFlag)))
+	opts := make([]packet.SubscribeOption, 0, fset.NArg()+1)
+	opts = append(opts, packet.WithSubscribePacketID(uint16(packetIDFlag)))
 	for _, topic := range fset.Args() {
-		opts = append(opts, mqtt.WithSubscribeTopic(topic, mqtt.QoS(qosFlag)))
+		opts = append(opts, packet.WithSubscribeTopic(topic, packet.QoS(qosFlag)))
 	}
-	if _, err = c.Subscribe(ctx, mqtt.NewSubscribePacket(opts...)); err != nil {
+	if _, err = c.Subscribe(ctx, packet.NewSubscribe(opts...)); err != nil {
 		return err
 	}
 

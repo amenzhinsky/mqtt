@@ -1,4 +1,4 @@
-package mqtt
+package packet
 
 import (
 	"fmt"
@@ -12,7 +12,7 @@ func WithPubrelPacketID(id uint16) PubrelOption {
 	}
 }
 
-func NewPubrelPacket(packetID uint16, opts ...PubrelOption) *Pubrel {
+func NewPubrel(packetID uint16, opts ...PubrelOption) *Pubrel {
 	pk := &Pubrel{
 		Flags:    pkPubrel | 0x02,
 		PacketID: packetID,

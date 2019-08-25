@@ -1,4 +1,4 @@
-package mqtt
+package packet
 
 import (
 	"fmt"
@@ -54,7 +54,7 @@ func WithConnackReturnCode(rc ConnectReturnCode) ConnackOption {
 	}
 }
 
-func NewConnackPacket(opts ...ConnackOption) *Connack {
+func NewConnack(opts ...ConnackOption) *Connack {
 	pk := &Connack{
 		Flags: pkConnack,
 	}

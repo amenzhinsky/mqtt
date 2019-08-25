@@ -1,26 +1,34 @@
-package mqtt
+package packet
 
 import (
 	"errors"
 	"io"
-	"sync"
 	"unicode/utf8"
 )
+
+func NewEncoderDecoder(rw io.ReadWriteCloser) *EncoderDecoder {
+	return &EncoderDecoder{NewEncoder(rw), NewDecoder(rw)}
+}
+
+type EncoderDecoder struct {
+	*Encoder
+	*Decoder
+}
+
+func (ed *EncoderDecoder) Close() error {
+	return ed.Encoder.w.(io.Closer).Close()
+}
 
 func NewEncoder(w io.Writer) *Encoder {
 	return &Encoder{w: w}
 }
 
 type Encoder struct {
-	m sync.Mutex
 	w io.Writer
 	b encoder
 }
 
 func (e *Encoder) Encode(pk OutgoingPacket) error {
-	e.m.Lock()
-	defer e.m.Unlock()
-
 	// reserve enough space for flags and the remaining length
 	e.b.reset()
 	e.b = append(e.b, byte(pk.flags()), 0, 0, 0, 0)

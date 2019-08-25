@@ -1,4 +1,4 @@
-package mqtt
+package packet
 
 type Pingresp struct {
 	Flags

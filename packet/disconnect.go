@@ -1,6 +1,6 @@
-package mqtt
+package packet
 
-func NewDisconnectPacket() *Disconnect {
+func NewDisconnect() *Disconnect {
 	return &Disconnect{
 		Flags: pkDisconnect,
 	}

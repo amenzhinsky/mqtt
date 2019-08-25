@@ -1,4 +1,4 @@
-package mqtt
+package packet
 
 import (
 	"fmt"
@@ -56,7 +56,7 @@ func WithPublishPayload(payload []byte) PublishOption {
 	}
 }
 
-func NewPublishPacket(topic string, opts ...PublishOption) *Publish {
+func NewPublish(topic string, opts ...PublishOption) *Publish {
 	pk := &Publish{
 		Flags: pkPublish,
 		Topic: topic,

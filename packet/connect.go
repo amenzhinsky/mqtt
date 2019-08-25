@@ -1,4 +1,4 @@
-package mqtt
+package packet
 
 import (
 	"fmt"
@@ -90,7 +90,7 @@ func WithConnectPassword(password string) ConnectOption {
 	}
 }
 
-func NewConnectPacket(opts ...ConnectOption) *Connect {
+func NewConnect(opts ...ConnectOption) *Connect {
 	pk := &Connect{
 		Flags:         pkConnect,
 		ProtocolName:  ProtocolName,

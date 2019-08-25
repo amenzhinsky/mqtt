@@ -1,4 +1,4 @@
-package mqtt
+package packet
 
 import (
 	"fmt"
@@ -19,7 +19,7 @@ func WithUnsubscribeTopic(topics ...string) UnsubscribeOption {
 	}
 }
 
-func NewUnsubscribePacket(opts ...UnsubscribeOption) *Unsubscribe {
+func NewUnsubscribe(opts ...UnsubscribeOption) *Unsubscribe {
 	pk := &Unsubscribe{
 		Flags: pkUnsubscribe | 0x02,
 	}

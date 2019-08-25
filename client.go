@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+
+	"github.com/amenzhinsky/mqtt/packet"
 )
 
 type Option func(c *Client)
@@ -29,20 +31,18 @@ func WithHandler(handler HandlerFunc) Option {
 
 func NewClient(rw io.ReadWriteCloser, opts ...Option) *Client {
 	c := &Client{
-		e: NewEncoder(rw),
-		d: NewDecoder(rw),
-		c: rw,
+		rw: packet.NewEncoderDecoder(rw),
 
 		outc: make(chan *out),
 		done: make(chan struct{}),
 
-		connackc:  make(chan *Connack),
-		pingrespc: make(chan *Pingresp),
-		subackc:   make(chan *Suback),
-		unsubackc: make(chan *Unsuback),
-		pubackc:   make(chan *Puback),
-		pubrecc:   make(chan *Pubrec),
-		pubcompc:  make(chan *Pubcomp),
+		connackc:  make(chan *packet.Connack),
+		pingrespc: make(chan *packet.Pingresp),
+		subackc:   make(chan *packet.Suback),
+		unsubackc: make(chan *packet.Unsuback),
+		pubackc:   make(chan *packet.Puback),
+		pubrecc:   make(chan *packet.Pubrec),
+		pubcompc:  make(chan *packet.Pubcomp),
 	}
 	for _, opt := range opts {
 		opt(c)
@@ -52,32 +52,30 @@ func NewClient(rw io.ReadWriteCloser, opts ...Option) *Client {
 	return c
 }
 
-type HandlerFunc func(publish *Publish)
+type HandlerFunc func(publish *packet.Publish)
 
 type Client struct {
-	e *Encoder
-	d *Decoder
-	c io.Closer
-
-	warn  Logger
-	debug Logger
+	rw *packet.EncoderDecoder
 
 	outc    chan *out
 	done    chan struct{}
 	err     error
 	handler HandlerFunc
 
-	connackc  chan *Connack
-	pingrespc chan *Pingresp
-	subackc   chan *Suback
-	unsubackc chan *Unsuback
-	pubackc   chan *Puback
-	pubrecc   chan *Pubrec
-	pubcompc  chan *Pubcomp
+	warn  Logger
+	debug Logger
+
+	connackc  chan *packet.Connack
+	pingrespc chan *packet.Pingresp
+	subackc   chan *packet.Suback
+	unsubackc chan *packet.Unsuback
+	pubackc   chan *packet.Puback
+	pubrecc   chan *packet.Pubrec
+	pubcompc  chan *packet.Pubcomp
 }
 
 type out struct {
-	pk   OutgoingPacket
+	pk   packet.OutgoingPacket
 	done chan struct{}
 }
 
@@ -85,13 +83,13 @@ type Logger interface {
 	Print(v ...interface{})
 }
 
-func (c *Client) Connect(ctx context.Context, connect *Connect) (*Connack, error) {
+func (c *Client) Connect(ctx context.Context, connect *packet.Connect) (*packet.Connack, error) {
 	if err := c.send(ctx, connect); err != nil {
 		return nil, err
 	}
 	select {
 	case connack := <-c.connackc:
-		if connack.ReturnCode != ConnectionAccepted {
+		if connack.ReturnCode != packet.ConnectionAccepted {
 			return nil, fmt.Errorf("connection failed: %s", connack.ReturnCode.String())
 		}
 		return connack, nil
@@ -103,7 +101,7 @@ func (c *Client) Connect(ctx context.Context, connect *Connect) (*Connack, error
 }
 
 func (c *Client) Ping(ctx context.Context) error {
-	if err := c.send(ctx, NewPingreqPacket()); err != nil {
+	if err := c.send(ctx, packet.NewPingreq()); err != nil {
 		return err
 	}
 	select {
@@ -117,17 +115,17 @@ func (c *Client) Ping(ctx context.Context) error {
 }
 
 func (c *Client) Disconnect(ctx context.Context) error {
-	return c.send(ctx, NewDisconnectPacket())
+	return c.send(ctx, packet.NewDisconnect())
 }
 
 var errInvalidPacketID = errors.New("invalid packet id")
 
-func (c *Client) Publish(ctx context.Context, publish *Publish) error {
+func (c *Client) Publish(ctx context.Context, publish *packet.Publish) error {
 	if err := c.send(ctx, publish); err != nil {
 		return err
 	}
 	switch {
-	case enabled(uint8(publish.Flags), PublishQoS1):
+	case enabled(publish.Flags, packet.PublishQoS1):
 		select {
 		case puback := <-c.pubackc:
 			if puback.PacketID != publish.PacketID {
@@ -137,13 +135,13 @@ func (c *Client) Publish(ctx context.Context, publish *Publish) error {
 		case <-c.done:
 			return c.err
 		}
-	case enabled(uint8(publish.Flags), PublishQoS2):
+	case enabled(publish.Flags, packet.PublishQoS2):
 		select {
 		case pubrec := <-c.pubrecc:
 			if pubrec.PacketID != publish.PacketID {
 				return errInvalidPacketID
 			}
-			if err := c.send(ctx, NewPubrelPacket(publish.PacketID)); err != nil {
+			if err := c.send(ctx, packet.NewPubrel(publish.PacketID)); err != nil {
 				return err
 			}
 			select {
@@ -163,7 +161,11 @@ func (c *Client) Publish(ctx context.Context, publish *Publish) error {
 	}
 }
 
-func (c *Client) Subscribe(ctx context.Context, subscribe *Subscribe) (*Suback, error) {
+func enabled(flags packet.Flags, flag uint8) bool {
+	return uint8(flags)&flag != 0
+}
+
+func (c *Client) Subscribe(ctx context.Context, subscribe *packet.Subscribe) (*packet.Suback, error) {
 	if err := c.send(ctx, subscribe); err != nil {
 		return nil, err
 	}
@@ -178,7 +180,7 @@ func (c *Client) Subscribe(ctx context.Context, subscribe *Subscribe) (*Suback, 
 	}
 }
 
-func (c *Client) Unsubscribe(ctx context.Context, unsubscribe *Unsubscribe) error {
+func (c *Client) Unsubscribe(ctx context.Context, unsubscribe *packet.Unsubscribe) error {
 	if err := c.send(ctx, unsubscribe); err != nil {
 		return err
 	}
@@ -195,62 +197,62 @@ func (c *Client) Unsubscribe(ctx context.Context, unsubscribe *Unsubscribe) erro
 
 func (c *Client) in() {
 	for {
-		pk, err := c.d.Decode()
+		pk, err := c.rw.Decode()
 		if err != nil {
 			c.close(err)
 			return
 		}
 		c.debugf("< %s", pk)
 		switch v := pk.(type) {
-		case *Connack:
+		case *packet.Connack:
 			select {
 			case c.connackc <- v:
 			case <-c.done:
 			default:
 				c.warnf("unexpected: %s", v)
 			}
-		case *Pingresp:
+		case *packet.Pingresp:
 			select {
 			case c.pingrespc <- v:
 			case <-c.done:
 				c.warnf("unexpected: %s", v)
 			}
-		case *Puback:
+		case *packet.Puback:
 			select {
 			case c.pubackc <- v:
 			case <-c.done:
 			default:
 				c.warnf("unexpected: %s", v)
 			}
-		case *Pubrec:
+		case *packet.Pubrec:
 			select {
 			case c.pubrecc <- v:
 			case <-c.done:
 			default:
 				c.warnf("unexpected: %s", v)
 			}
-		case *Pubcomp:
+		case *packet.Pubcomp:
 			select {
 			case c.pubcompc <- v:
 			case <-c.done:
 			default:
 				c.warnf("unexpected: %s", v)
 			}
-		case *Suback:
+		case *packet.Suback:
 			select {
 			case c.subackc <- v:
 			case <-c.done:
 			default:
 				c.warnf("unexpected: %s", v)
 			}
-		case *Unsuback:
+		case *packet.Unsuback:
 			select {
 			case c.unsubackc <- v:
 			case <-c.done:
 			default:
 				c.warnf("unexpected: %s", v)
 			}
-		case *Publish:
+		case *packet.Publish:
 			if c.handler != nil {
 				c.handler(v)
 			} else {
@@ -264,7 +266,7 @@ func (c *Client) in() {
 
 func (c *Client) out() {
 	for pk := range c.outc {
-		if err := c.e.Encode(pk.pk); err != nil {
+		if err := c.rw.Encode(pk.pk); err != nil {
 			c.close(err)
 			return
 		}
@@ -285,7 +287,7 @@ func (c *Client) debugf(format string, v ...interface{}) {
 	}
 }
 
-func (c *Client) send(ctx context.Context, pk OutgoingPacket) error {
+func (c *Client) send(ctx context.Context, pk packet.OutgoingPacket) error {
 	o := &out{pk: pk, done: make(chan struct{})}
 	select {
 	case c.outc <- o:
@@ -314,5 +316,5 @@ func (c *Client) close(err error) {
 }
 
 func (c *Client) Close() error {
-	return c.c.Close()
+	return c.rw.Close()
 }

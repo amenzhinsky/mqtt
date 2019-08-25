@@ -1,4 +1,4 @@
-package mqtt
+package packet
 
 import (
 	"fmt"
@@ -22,7 +22,7 @@ func WithSubscribeTopic(topic string, qos QoS) SubscribeOption {
 	}
 }
 
-func NewSubscribePacket(opts ...SubscribeOption) *Subscribe {
+func NewSubscribe(opts ...SubscribeOption) *Subscribe {
 	pk := &Subscribe{
 		Flags: pkSubscribe | 0x02,
 	}

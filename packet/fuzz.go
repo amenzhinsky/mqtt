@@ -1,6 +1,6 @@
 //+build fuzz
 
-package mqtt
+package packet
 
 import (
 	"bytes"

@@ -1,6 +1,8 @@
-package mqtt
+package packet
 
-import "fmt"
+import (
+	"fmt"
+)
 
 type Pubrec struct {
 	Flags

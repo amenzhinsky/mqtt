@@ -1,6 +1,6 @@
-package mqtt
+package packet
 
-func NewPingreqPacket() *Pingreq {
+func NewPingreq() *Pingreq {
 	return &Pingreq{
 		Flags: pkPingreq,
 	}
