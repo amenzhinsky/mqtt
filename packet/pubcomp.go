@@ -9,7 +9,7 @@ type Pubcomp struct {
 	PacketID uint16
 }
 
-func (pk *Pubcomp) decode(d *decoder) error {
+func (pk *Pubcomp) Decode(d Decoder) error {
 	var err error
 	pk.PacketID, err = d.Integer()
 	if err != nil {

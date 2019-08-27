@@ -28,7 +28,7 @@ type Pubrel struct {
 	PacketID uint16
 }
 
-func (pk *Pubrel) encode(e *encoder) error {
+func (pk *Pubrel) Encode(e Encoder) error {
 	return e.Integer(pk.PacketID)
 }
 

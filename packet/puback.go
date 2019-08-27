@@ -9,7 +9,7 @@ type Puback struct {
 	PacketID uint16
 }
 
-func (pk *Puback) decode(d *decoder) error {
+func (pk *Puback) Decode(d Decoder) error {
 	var err error
 	pk.PacketID, err = d.Integer()
 	if err != nil {

@@ -74,7 +74,7 @@ type Publish struct {
 	PacketID uint16
 }
 
-func (pk *Publish) encode(e *encoder) error {
+func (pk *Publish) Encode(e Encoder) error {
 	var err error
 	if err = e.String(pk.Topic); err != nil {
 		return err
@@ -90,7 +90,7 @@ func (pk *Publish) encode(e *encoder) error {
 	return nil
 }
 
-func (pk *Publish) decode(d *decoder) error {
+func (pk *Publish) Decode(d Decoder) error {
 	var err error
 	pk.Topic, err = d.String()
 	if err != nil {

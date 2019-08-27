@@ -20,7 +20,7 @@ type Suback struct {
 	ReturnCodes []uint8
 }
 
-func (pk *Suback) decode(d *decoder) error {
+func (pk *Suback) Decode(d Decoder) error {
 	var err error
 	pk.PacketID, err = d.Integer()
 	if err != nil {

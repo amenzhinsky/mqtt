@@ -115,7 +115,7 @@ type Connect struct {
 	Password      string
 }
 
-func (pk *Connect) encode(e *encoder) error {
+func (pk *Connect) Encode(e Encoder) error {
 	var err error
 	if err = e.String(pk.ProtocolName); err != nil {
 		return err

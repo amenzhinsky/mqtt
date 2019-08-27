@@ -47,7 +47,7 @@ func (t *SubscribeTopic) String() string {
 	return fmt.Sprintf("%s q%d", t.Name, t.Flags)
 }
 
-func (pk *Subscribe) encode(e *encoder) error {
+func (pk *Subscribe) Encode(e Encoder) error {
 	var err error
 	if err = e.Integer(pk.PacketID); err != nil {
 		return err

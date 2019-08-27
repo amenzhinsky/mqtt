@@ -10,7 +10,7 @@ type Disconnect struct {
 	Flags
 }
 
-func (pk *Disconnect) encode(e *encoder) error {
+func (pk *Disconnect) Encode(e Encoder) error {
 	return nil
 }
 

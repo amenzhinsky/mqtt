@@ -35,7 +35,7 @@ type Unsubscribe struct {
 	Topics   []string
 }
 
-func (pk *Unsubscribe) encode(e *encoder) error {
+func (pk *Unsubscribe) Encode(e Encoder) error {
 	var err error
 	if err = e.Integer(pk.PacketID); err != nil {
 		return err

@@ -70,7 +70,7 @@ type Connack struct {
 	ReturnCode       ConnectReturnCode
 }
 
-func (pk *Connack) decode(d *decoder) error {
+func (pk *Connack) Decode(d Decoder) error {
 	var err error
 	pk.AcknowledgeFlags, err = d.Bits()
 	if err != nil {

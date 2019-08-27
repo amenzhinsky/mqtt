@@ -4,7 +4,7 @@ type Pingresp struct {
 	Flags
 }
 
-func (pk *Pingresp) decode(d *decoder) error {
+func (pk *Pingresp) Decode(d Decoder) error {
 	return nil
 }
 

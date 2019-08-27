@@ -1,23 +1,12 @@
-package packet
+package mqtt
 
 import (
 	"errors"
 	"io"
 	"unicode/utf8"
+
+	"github.com/amenzhinsky/mqtt/packet"
 )
-
-func NewEncoderDecoder(rw io.ReadWriteCloser) *EncoderDecoder {
-	return &EncoderDecoder{NewEncoder(rw), NewDecoder(rw)}
-}
-
-type EncoderDecoder struct {
-	*Encoder
-	*Decoder
-}
-
-func (ed *EncoderDecoder) Close() error {
-	return ed.Encoder.w.(io.Closer).Close()
-}
 
 func NewEncoder(w io.Writer) *Encoder {
 	return &Encoder{w: w}
@@ -25,16 +14,16 @@ func NewEncoder(w io.Writer) *Encoder {
 
 type Encoder struct {
 	w io.Writer
-	b encoder
+	b enc
 }
 
-func (e *Encoder) Encode(pk OutgoingPacket) error {
+func (e *Encoder) Encode(pk packet.OutgoingPacket) error {
 	// reserve enough space for flags and the remaining length
 	e.b.reset()
-	e.b = append(e.b, byte(pk.flags()), 0, 0, 0, 0)
+	e.b = append(e.b, byte(pk.GetFlags()), 0, 0, 0, 0)
 
 	var err error
-	if err = pk.encode(&e.b); err != nil {
+	if err = pk.Encode(&e.b); err != nil {
 		return err
 	}
 
@@ -83,9 +72,9 @@ func encodeLen(fh []byte, size int) error {
 	}
 }
 
-type encoder []byte
+type enc []byte
 
-func (e *encoder) reset() {
+func (e *enc) reset() {
 	if e == nil {
 		*e = make([]byte, 0, 4096)
 	} else {
@@ -93,24 +82,24 @@ func (e *encoder) reset() {
 	}
 }
 
-func (e *encoder) Bits(c uint8) error {
+func (e *enc) Bits(c uint8) error {
 	*e = append(*e, c)
 	return nil
 }
 
-func (e *encoder) Integer(n uint16) error {
+func (e *enc) Integer(n uint16) error {
 	*e = append(*e, uint8(n>>8), uint8(n))
 	return nil
 }
 
-func (e *encoder) Payload(b []byte) error {
+func (e *enc) Payload(b []byte) error {
 	*e = append(*e, b...)
 	return nil
 }
 
 const maxUint16 = 1<<16 - 1
 
-func (e *encoder) Bytes(b []byte) error {
+func (e *enc) Bytes(b []byte) error {
 	if len(b) > maxUint16 {
 		return errors.New("too long bytes array")
 	}
@@ -121,7 +110,7 @@ func (e *encoder) Bytes(b []byte) error {
 	return nil
 }
 
-func (e *encoder) String(s string) error {
+func (e *enc) String(s string) error {
 	if !utf8.ValidString(s) {
 		return errors.New("invalid utf-8 string")
 	}

@@ -30,9 +30,22 @@ func WithHandler(handler HandlerFunc) Option {
 	}
 }
 
+func newEncoderDecoder(rw io.ReadWriteCloser) *encoderDecoder {
+	return &encoderDecoder{NewEncoder(rw), NewDecoder(rw)}
+}
+
+type encoderDecoder struct {
+	*Encoder
+	*Decoder
+}
+
+func (ed *encoderDecoder) Close() error {
+	return ed.Encoder.w.(io.Closer).Close()
+}
+
 func New(rw io.ReadWriteCloser, opts ...Option) *Client {
 	c := &Client{
-		rw: packet.NewEncoderDecoder(rw),
+		rw: newEncoderDecoder(rw),
 
 		outc: make(chan *out),
 		done: make(chan struct{}),
@@ -56,7 +69,7 @@ func New(rw io.ReadWriteCloser, opts ...Option) *Client {
 type HandlerFunc func(publish *packet.Publish)
 
 type Client struct {
-	rw *packet.EncoderDecoder
+	rw *encoderDecoder
 
 	outc    chan *out
 	done    chan struct{}

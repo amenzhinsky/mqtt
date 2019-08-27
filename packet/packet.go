@@ -4,43 +4,9 @@ import (
 	"fmt"
 )
 
-//type Packet struct {
-//	Flags
-//}
-//
-//func ReadFrom(r io.Reader) error {
-//	fh := make([]byte, 2)
-//	_, err := r.Read(fh)
-//	if err != nil {
-//		return err
-//	}
-//
-//	pk := &Packet{Flags: Flags(fh[0])}
-//
-//}
-//
-//func readByte(r io.Reader) (byte, error) {
-//	if br, ok := r.(io.ByteReader); ok {
-//		return br.ReadByte()
-//	}
-//	b := make([]byte, 1)
-//	if _, err := r.Read(b); err != nil {
-//		return 0, err
-//	}
-//	return b[0], nil
-//}
-//
-//func readBytes(r io.Reader, n int) ([]byte, error) {
-//	b := make([]byte, n)
-//	if _, err := io.ReadFull(r, b); err != nil {
-//		return nil, err
-//	}
-//	return b, nil
-//}
-
 type Flags uint8
 
-func (h Flags) flags() Flags {
+func (h Flags) GetFlags() Flags {
 	return h
 }
 
@@ -69,19 +35,58 @@ const (
 	pkDisconnect
 )
 
+type Encoder interface {
+	Bits(uint8) error
+	Integer(uint16) error
+	Payload([]byte) error
+	Bytes([]byte) error
+	String(string) error
+}
+
+type Decoder interface {
+	Bits() (uint8, error)
+	Integer() (uint16, error)
+	Payload() ([]byte, error)
+	Bytes() ([]byte, error)
+	String() (string, error)
+}
+
+func NewIncomingPacket(fh uint8) IncomingPacket {
+	switch fh & 0xf0 {
+	case pkConnack:
+		return &Connack{Flags: Flags(fh)}
+	case pkPublish:
+		return &Publish{Flags: Flags(fh)}
+	case pkPuback:
+		return &Puback{Flags: Flags(fh)}
+	case pkPubrec:
+		return &Pubrec{Flags: Flags(fh)}
+	case pkPubcomp:
+		return &Pubcomp{Flags: Flags(fh)}
+	case pkSuback:
+		return &Suback{Flags: Flags(fh)}
+	case pkUnsuback:
+		return &Unsuback{Flags: Flags(fh)}
+	case pkPingresp:
+		return &Pingresp{Flags: Flags(fh)}
+	default:
+		return nil
+	}
+}
+
 type OutgoingPacket interface {
 	packet
-	encode(e *encoder) error
+	Encode(e Encoder) error
 }
 
 type IncomingPacket interface {
 	packet
-	decode(d *decoder) error
+	Decode(d Decoder) error
 }
 
 type packet interface {
 	fmt.Stringer
-	flags() Flags
+	GetFlags() Flags
 }
 
 func flag(flags, flag uint8) uint8 {

@@ -10,7 +10,7 @@ type Pingreq struct {
 	Flags
 }
 
-func (pk *Pingreq) encode(e *encoder) error {
+func (pk *Pingreq) Encode(e Encoder) error {
 	return nil
 }
 

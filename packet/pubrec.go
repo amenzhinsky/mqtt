@@ -9,7 +9,7 @@ type Pubrec struct {
 	PacketID uint16
 }
 
-func (pk *Pubrec) decode(d *decoder) error {
+func (pk *Pubrec) Decode(d Decoder) error {
 	var err error
 	pk.PacketID, err = d.Integer()
 	if err != nil {
