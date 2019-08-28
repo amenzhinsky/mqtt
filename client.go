@@ -24,7 +24,9 @@ func WithDebugLogger(logger Logger) Option {
 	}
 }
 
-func WithHandler(handler HandlerFunc) Option {
+type MessagesHandler func(publish *packet.Publish)
+
+func WithMessagesHandler(handler MessagesHandler) Option {
 	return func(c *Client) {
 		c.handler = handler
 	}
@@ -66,16 +68,13 @@ func New(rw io.ReadWriteCloser, opts ...Option) *Client {
 	return c
 }
 
-type HandlerFunc func(publish *packet.Publish)
-
 type Client struct {
 	rw *encoderDecoder
 
 	outc    chan *out
 	done    chan struct{}
 	err     error
-	handler HandlerFunc
-	pid     uint16
+	handler MessagesHandler
 
 	warn  Logger
 	debug Logger
@@ -135,14 +134,9 @@ func (c *Client) Disconnect(ctx context.Context) error {
 
 var errInvalidPacketID = errors.New("invalid packet id")
 
-func (c *Client) genid() uint16 {
-	c.pid++
-	return c.pid
-}
-
 func (c *Client) Publish(ctx context.Context, publish *packet.Publish) error {
 	if publish.PacketID == 0 {
-		publish.PacketID = c.genid()
+		publish.PacketID = 1
 	}
 	if err := c.send(ctx, publish); err != nil {
 		return err
@@ -192,7 +186,7 @@ func (c *Client) Subscribe(
 	ctx context.Context, subscribe *packet.Subscribe,
 ) (*packet.Suback, error) {
 	if subscribe.PacketID == 0 {
-		subscribe.PacketID = c.genid()
+		subscribe.PacketID = 1
 	}
 	if err := c.send(ctx, subscribe); err != nil {
 		return nil, err
@@ -210,7 +204,7 @@ func (c *Client) Subscribe(
 
 func (c *Client) Unsubscribe(ctx context.Context, unsubscribe *packet.Unsubscribe) error {
 	if unsubscribe.PacketID == 0 {
-		unsubscribe.PacketID = c.genid()
+		unsubscribe.PacketID = 1
 	}
 	if err := c.send(ctx, unsubscribe); err != nil {
 		return err

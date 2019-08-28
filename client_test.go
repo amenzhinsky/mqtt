@@ -13,7 +13,7 @@ import (
 
 func TestPubSub(t *testing.T) {
 	pbc := make(chan *packet.Publish)
-	sub := newClient(t, WithHandler(func(publish *packet.Publish) {
+	sub := newClient(t, WithMessagesHandler(func(publish *packet.Publish) {
 		pbc <- publish
 	}))
 	defer sub.Close()

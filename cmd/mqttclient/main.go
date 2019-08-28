@@ -186,7 +186,7 @@ func sub(ctx context.Context, connect connectFunc, argv []string) error {
 		os.Exit(2)
 	}
 
-	c, err := connect(ctx, mqtt.WithHandler(func(publish *packet.Publish) {
+	c, err := connect(ctx, mqtt.WithMessagesHandler(func(publish *packet.Publish) {
 		fmt.Printf("%s %s\n", publish.Topic, string(publish.Payload))
 	}))
 	if err != nil {
