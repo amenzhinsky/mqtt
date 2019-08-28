@@ -36,6 +36,7 @@ const (
 )
 
 type Encoder interface {
+	Len(int) error
 	Bits(uint8) error
 	Integer(uint16) error
 	Payload([]byte) error
@@ -98,4 +99,17 @@ func flag(flags, flag uint8) uint8 {
 
 func enabled(flags, flag uint8) bool {
 	return flags&flag != 0
+}
+
+const (
+	bitsLen    = 1
+	integerLen = 2
+)
+
+func stringLen(s string) int {
+	return integerLen + len(s)
+}
+
+func bytesLen(b []byte) int {
+	return integerLen + len(b)
 }

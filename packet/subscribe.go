@@ -48,7 +48,15 @@ func (t *SubscribeTopic) String() string {
 }
 
 func (pk *Subscribe) Encode(e Encoder) error {
+	n := integerLen // PacketID
+	for _, topic := range pk.Topics {
+		n += stringLen(topic.Name) + bitsLen // Flags
+	}
+
 	var err error
+	if err = e.Len(n); err != nil {
+		return err
+	}
 	if err = e.Integer(pk.PacketID); err != nil {
 		return err
 	}

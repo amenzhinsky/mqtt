@@ -36,7 +36,15 @@ type Unsubscribe struct {
 }
 
 func (pk *Unsubscribe) Encode(e Encoder) error {
+	n := integerLen // PacketID
+	for _, topic := range pk.Topics {
+		n += stringLen(topic)
+	}
+
 	var err error
+	if err = e.Len(n); err != nil {
+		return err
+	}
 	if err = e.Integer(pk.PacketID); err != nil {
 		return err
 	}

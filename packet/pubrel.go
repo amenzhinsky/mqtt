@@ -29,6 +29,9 @@ type Pubrel struct {
 }
 
 func (pk *Pubrel) Encode(e Encoder) error {
+	if err := e.Len(2); err != nil {
+		return err
+	}
 	return e.Integer(pk.PacketID)
 }
 

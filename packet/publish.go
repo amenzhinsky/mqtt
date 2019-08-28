@@ -75,11 +75,24 @@ type Publish struct {
 }
 
 func (pk *Publish) Encode(e Encoder) error {
+	nonZeroQoS := enabled(uint8(pk.Flags), PublishQoS1|PublishQoS2)
+
+	n := stringLen(pk.Topic)
+	if nonZeroQoS {
+		n += integerLen
+	}
+	if pk.Payload != nil {
+		n += len(pk.Payload)
+	}
+
 	var err error
+	if err = e.Len(n); err != nil {
+		return err
+	}
 	if err = e.String(pk.Topic); err != nil {
 		return err
 	}
-	if enabled(uint8(pk.Flags), PublishQoS1|PublishQoS2) {
+	if nonZeroQoS {
 		if err = e.Integer(pk.PacketID); err != nil {
 			return err
 		}

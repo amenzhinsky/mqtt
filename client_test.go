@@ -63,7 +63,7 @@ func TestPubSub(t *testing.T) {
 			if packet.QoS(p.Payload[0]) != qos {
 				t.Fatalf("invalid QoS have %d, want %d", p.Payload[0], qos)
 			}
-		case <-time.After(time.Second):
+		case <-time.After(5 * time.Second):
 			t.Fatal("recv timed out")
 		}
 	}

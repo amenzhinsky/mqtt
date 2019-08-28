@@ -11,7 +11,7 @@ type Disconnect struct {
 }
 
 func (pk *Disconnect) Encode(e Encoder) error {
-	return nil
+	return e.Len(0)
 }
 
 func (pk *Disconnect) String() string {

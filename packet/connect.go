@@ -116,7 +116,30 @@ type Connect struct {
 }
 
 func (pk *Connect) Encode(e Encoder) error {
+	hasWill := enabled(pk.ConnectFlags, ConnectFlagWillFlag)
+	hasUsername := enabled(pk.ConnectFlags, ConnectFlagUsername)
+	hasPassword := enabled(pk.ConnectFlags, ConnectFlagPassword)
+
+	n := stringLen(pk.ProtocolName) +
+		bitsLen + // ProtocolLevel
+		bitsLen + // ConnectFlags
+		integerLen + // KeepAlive
+		stringLen(pk.ClientID)
+
+	if hasWill {
+		n += stringLen(pk.WillTopic) + bytesLen(pk.WillPayload)
+	}
+	if hasUsername {
+		n += stringLen(pk.Username)
+	}
+	if hasPassword {
+		n += stringLen(pk.Password)
+	}
+
 	var err error
+	if err = e.Len(n); err != nil {
+		return err
+	}
 	if err = e.String(pk.ProtocolName); err != nil {
 		return err
 	}
@@ -132,7 +155,7 @@ func (pk *Connect) Encode(e Encoder) error {
 	if err = e.String(pk.ClientID); err != nil {
 		return err
 	}
-	if enabled(pk.ConnectFlags, ConnectFlagWillFlag) {
+	if hasWill {
 		if err = e.String(pk.WillTopic); err != nil {
 			return err
 		}
@@ -140,12 +163,12 @@ func (pk *Connect) Encode(e Encoder) error {
 			return err
 		}
 	}
-	if enabled(pk.ConnectFlags, ConnectFlagUsername) {
+	if hasUsername {
 		if err = e.String(pk.Username); err != nil {
 			return err
 		}
 	}
-	if enabled(pk.ConnectFlags, ConnectFlagPassword) {
+	if hasPassword {
 		if err = e.String(pk.Password); err != nil {
 			return err
 		}
