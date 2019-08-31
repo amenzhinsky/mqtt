@@ -109,6 +109,12 @@ func (pk *Publish) Decode(d Decoder) error {
 	if err != nil {
 		return err
 	}
+	if enabled(uint8(pk.Flags), PublishQoS1|PublishQoS2) {
+		pk.PacketID, err = d.Integer()
+		if err != nil {
+			return err
+		}
+	}
 	pk.Payload, err = d.Payload()
 	if err != nil {
 		return err

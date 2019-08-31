@@ -132,17 +132,26 @@ func (c *Client) Disconnect(ctx context.Context) error {
 	return c.send(ctx, packet.NewDisconnect())
 }
 
-var errInvalidPacketID = errors.New("invalid packet id")
+var (
+	errZeroPacketID    = errors.New("packet id is zero")
+	errNonZeroPacketID = errors.New("packet id is not zero")
+	errInvalidPacketID = errors.New("invalid packet id")
+)
 
 func (c *Client) Publish(ctx context.Context, publish *packet.Publish) error {
-	if publish.PacketID == 0 {
-		publish.PacketID = 1
+	qos1 := enabled(publish.Flags, packet.PublishQoS1)
+	qos2 := enabled(publish.Flags, packet.PublishQoS2)
+	if (!qos1 && !qos2) && publish.PacketID != 0 {
+		return errNonZeroPacketID
+	} else if (qos1 || qos2) && publish.PacketID == 0 {
+		return errZeroPacketID
 	}
+
 	if err := c.send(ctx, publish); err != nil {
 		return err
 	}
 	switch {
-	case enabled(publish.Flags, packet.PublishQoS1):
+	case qos1:
 		select {
 		case puback := <-c.pubackc:
 			if puback.PacketID != publish.PacketID {
@@ -152,7 +161,7 @@ func (c *Client) Publish(ctx context.Context, publish *packet.Publish) error {
 		case <-c.done:
 			return c.err
 		}
-	case enabled(publish.Flags, packet.PublishQoS2):
+	case qos2:
 		select {
 		case pubrec := <-c.pubrecc:
 			if pubrec.PacketID != publish.PacketID {
@@ -186,7 +195,7 @@ func (c *Client) Subscribe(
 	ctx context.Context, subscribe *packet.Subscribe,
 ) (*packet.Suback, error) {
 	if subscribe.PacketID == 0 {
-		subscribe.PacketID = 1
+		return nil, errZeroPacketID
 	}
 	if err := c.send(ctx, subscribe); err != nil {
 		return nil, err
@@ -204,7 +213,7 @@ func (c *Client) Subscribe(
 
 func (c *Client) Unsubscribe(ctx context.Context, unsubscribe *packet.Unsubscribe) error {
 	if unsubscribe.PacketID == 0 {
-		unsubscribe.PacketID = 1
+		return errZeroPacketID
 	}
 	if err := c.send(ctx, unsubscribe); err != nil {
 		return err

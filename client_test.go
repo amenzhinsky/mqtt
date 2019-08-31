@@ -27,6 +27,7 @@ func TestPubSub(t *testing.T) {
 	}
 
 	if _, err := sub.Subscribe(context.Background(), packet.NewSubscribe(
+		packet.WithSubscribePacketID(1),
 		packet.WithSubscribeTopic("test/#", packet.QoS1),
 	)); err != nil {
 		t.Fatal(err)
@@ -51,7 +52,8 @@ func TestPubSub(t *testing.T) {
 	for _, qos := range []packet.QoS{packet.QoS0, packet.QoS1, packet.QoS2} {
 		if err := pub.Publish(context.Background(),
 			packet.NewPublish(fmt.Sprintf("test/%d", qos),
-				packet.WithPublishQoS(packet.QoS0),
+				packet.WithPublishPacketID(uint16(qos)),
+				packet.WithPublishQoS(qos),
 				packet.WithPublishPayload([]byte{byte(qos)}),
 			),
 		); err != nil {
@@ -60,8 +62,11 @@ func TestPubSub(t *testing.T) {
 
 		select {
 		case p := <-pbc:
+			if len(p.Payload) != 1 {
+				t.Fatal("invalid payload length")
+			}
 			if packet.QoS(p.Payload[0]) != qos {
-				t.Fatalf("invalid QoS have %d, want %d", p.Payload[0], qos)
+				t.Fatalf("qos = %d, want %d", p.Payload[0], qos)
 			}
 		case <-time.After(5 * time.Second):
 			t.Fatal("recv timed out")
@@ -69,6 +74,7 @@ func TestPubSub(t *testing.T) {
 	}
 
 	if err := sub.Unsubscribe(context.Background(), packet.NewUnsubscribe(
+		packet.WithUnsubscribePacketID(1),
 		packet.WithUnsubscribeTopic("test/#"),
 	)); err != nil {
 		t.Fatal(err)
