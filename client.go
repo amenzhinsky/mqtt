@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sync/atomic"
 
 	"github.com/amenzhinsky/mqtt/packet"
 )
@@ -71,6 +72,7 @@ func New(rw io.ReadWriteCloser, opts ...Option) *Client {
 type Client struct {
 	rw *encoderDecoder
 
+	pkid    uint32
 	outc    chan *out
 	done    chan struct{}
 	err     error
@@ -95,6 +97,10 @@ type out struct {
 
 type Logger interface {
 	Print(v ...interface{})
+}
+
+func (c *Client) genID() uint16 {
+	return uint16(atomic.AddUint32(&c.pkid, 1))
 }
 
 func (c *Client) Connect(ctx context.Context, connect *packet.Connect) (*packet.Connack, error) {
@@ -133,7 +139,6 @@ func (c *Client) Disconnect(ctx context.Context) error {
 }
 
 var (
-	errZeroPacketID    = errors.New("packet id is zero")
 	errNonZeroPacketID = errors.New("packet id is not zero")
 	errInvalidPacketID = errors.New("invalid packet id")
 )
@@ -144,7 +149,7 @@ func (c *Client) Publish(ctx context.Context, publish *packet.Publish) error {
 	if (!qos1 && !qos2) && publish.PacketID != 0 {
 		return errNonZeroPacketID
 	} else if (qos1 || qos2) && publish.PacketID == 0 {
-		return errZeroPacketID
+		publish.PacketID = c.genID()
 	}
 
 	if err := c.send(ctx, publish); err != nil {
@@ -201,7 +206,7 @@ func (c *Client) Subscribe(
 	ctx context.Context, subscribe *packet.Subscribe,
 ) (*packet.Suback, error) {
 	if subscribe.PacketID == 0 {
-		return nil, errZeroPacketID
+		subscribe.PacketID = c.genID()
 	}
 	if err := c.send(ctx, subscribe); err != nil {
 		return nil, err
@@ -221,7 +226,7 @@ func (c *Client) Subscribe(
 
 func (c *Client) Unsubscribe(ctx context.Context, unsubscribe *packet.Unsubscribe) error {
 	if unsubscribe.PacketID == 0 {
-		return errZeroPacketID
+		unsubscribe.PacketID = c.genID()
 	}
 	if err := c.send(ctx, unsubscribe); err != nil {
 		return err

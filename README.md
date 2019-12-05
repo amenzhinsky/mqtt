@@ -20,6 +20,7 @@ client := mqtt.New(conn, mqtt.WithMessagesHandler(func(pk *packet.Publish) {
 		play(strings.Split(pk.Topic, "/")[3], pk.Payload)
 	}
 }))
+defer client.Close()
 
 if _, err := client.Connect(context.Background(), packet.NewConnect(
 	packet.WithConnectCleanSession(true),
@@ -37,10 +38,13 @@ if _, err := client.Subscribe(context.Background(), packet.NewSubscribe(
 
 if err := client.Publish(context.Background(), packet.NewPublish(
 	"/dev/online",
-	packet.WithPublishPacketID(1),
 	packet.WithPublishQoS(packet.QoS1),
 	packet.WithPublishPayload([]byte{1}),
 )); err != nil {
+	return err
+}
+
+if err := client.Disconnect(context.Background()); err != nil {
 	return err
 }
 ```

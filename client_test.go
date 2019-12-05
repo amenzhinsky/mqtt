@@ -52,7 +52,6 @@ func TestPubSub(t *testing.T) {
 	for _, qos := range []packet.QoS{packet.QoS0, packet.QoS1, packet.QoS2} {
 		if err := pub.Publish(context.Background(),
 			packet.NewPublish(fmt.Sprintf("test/%d", qos),
-				packet.WithPublishPacketID(uint16(qos)),
 				packet.WithPublishQoS(qos),
 				packet.WithPublishPayload([]byte{byte(qos)}),
 			),
@@ -74,7 +73,6 @@ func TestPubSub(t *testing.T) {
 	}
 
 	if err := sub.Unsubscribe(context.Background(), packet.NewUnsubscribe(
-		packet.WithUnsubscribePacketID(1),
 		packet.WithUnsubscribeTopic("test/#"),
 	)); err != nil {
 		t.Fatal(err)

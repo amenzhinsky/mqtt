@@ -31,9 +31,9 @@ var (
 
 func main() {
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, `Usage: %s [common flags...] [pub|sub] [flag...] [arg...]
+		fmt.Fprintf(os.Stderr, `Usage: %s [common options...] [pub|sub] [option...] [arg...]
 
-Common Flags:
+Common Options:
 `, filepath.Base(os.Args[0]))
 		flag.PrintDefaults()
 	}
@@ -50,7 +50,7 @@ Common Flags:
 	flag.BoolVar(&willRetainFlag, "will-retain", false, "make the will retained")
 	flag.Parse()
 	if flag.NArg() == 0 {
-		flag.PrintDefaults()
+		flag.Usage()
 		os.Exit(2)
 	}
 
@@ -68,8 +68,7 @@ func run() error {
 	go func() {
 		<-sigc
 		cancel()
-		<-sigc
-		os.Exit(1)
+		signal.Reset()
 	}()
 
 	switch flag.Arg(0) {
@@ -121,17 +120,17 @@ func pub(ctx context.Context, connect connectFunc, argv []string) error {
 
 	fset := flag.NewFlagSet("pub", flag.ExitOnError)
 	fset.Usage = func() {
-		fmt.Fprintf(os.Stderr, `Usage: %s [common flags...] pub [flags...] TOPIC [payload]
+		fmt.Fprintf(os.Stderr, `Usage: %s [common option...] pub [option...] TOPIC [payload]
 
-Flags:
+Options:
 `, filepath.Base(os.Args[0]))
 		fset.PrintDefaults()
-		fmt.Fprintf(os.Stderr, "\nCommon Flags:\n")
+		fmt.Fprintf(os.Stderr, "\nCommon Options:\n")
 		flag.PrintDefaults()
 	}
 	fset.UintVar(&qosFlag, "qos", 0, "qos level")
 	fset.BoolVar(&retainFlag, "retain", false, "retained message")
-	fset.UintVar(&packetIDFlag, "packet-id", 1, "packet identifier")
+	fset.UintVar(&packetIDFlag, "packet-id", 0, "packet identifier")
 	_ = fset.Parse(argv) // exits on error
 
 	var payload []byte
@@ -170,7 +169,7 @@ func sub(ctx context.Context, connect connectFunc, argv []string) error {
 
 	fset := flag.NewFlagSet("pub", flag.ExitOnError)
 	fset.Usage = func() {
-		fmt.Fprintf(os.Stderr, `Usage: %s [common flags...] sub [flags...] TOPIC...
+		fmt.Fprintf(os.Stderr, `Usage: %s [common option...] sub [options...] TOPIC...
 
 	Flags:
 	`, filepath.Base(os.Args[0]))
@@ -179,7 +178,7 @@ func sub(ctx context.Context, connect connectFunc, argv []string) error {
 		flag.PrintDefaults()
 	}
 	fset.UintVar(&qosFlag, "qos", 0, "qos level")
-	fset.UintVar(&packetIDFlag, "packet-id", 1, "packet identifier")
+	fset.UintVar(&packetIDFlag, "packet-id", 0, "packet identifier")
 	_ = fset.Parse(argv) // exits on error
 	if fset.NArg() == 0 {
 		fset.Usage()
