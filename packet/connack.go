@@ -66,8 +66,11 @@ func NewConnack(opts ...ConnackOption) *Connack {
 
 type Connack struct {
 	Flags
+
+	// AcknowledgeFlags reserved and MUST be set to zero.
 	AcknowledgeFlags uint8
-	ReturnCode       ConnectReturnCode
+
+	ReturnCode ConnectReturnCode
 }
 
 func (pk *Connack) Decode(d Decoder) error {

@@ -63,8 +63,8 @@ func New(rw io.ReadWriteCloser, opts ...Option) *Client {
 	for _, opt := range opts {
 		opt(c)
 	}
-	go c.in()
-	go c.out()
+	go c.rx()
+	go c.tx()
 	return c
 }
 
@@ -160,6 +160,8 @@ func (c *Client) Publish(ctx context.Context, publish *packet.Publish) error {
 			return nil
 		case <-c.done:
 			return c.err
+		case <-ctx.Done():
+			return ctx.Err()
 		}
 	case qos2:
 		select {
@@ -178,9 +180,13 @@ func (c *Client) Publish(ctx context.Context, publish *packet.Publish) error {
 				return nil
 			case <-c.done:
 				return c.err
+			case <-ctx.Done():
+				return ctx.Err()
 			}
 		case <-c.done:
 			return c.err
+		case <-ctx.Done():
+			return ctx.Err()
 		}
 	default:
 		return nil
@@ -208,6 +214,8 @@ func (c *Client) Subscribe(
 		return suback, nil
 	case <-c.done:
 		return nil, c.err
+	case <-ctx.Done():
+		return nil, ctx.Err()
 	}
 }
 
@@ -226,10 +234,12 @@ func (c *Client) Unsubscribe(ctx context.Context, unsubscribe *packet.Unsubscrib
 		return nil
 	case <-c.done:
 		return c.err
+	case <-ctx.Done():
+		return ctx.Err()
 	}
 }
 
-func (c *Client) in() {
+func (c *Client) rx() {
 	for {
 		pk, err := c.rw.Decode()
 		if err != nil {
@@ -298,7 +308,7 @@ func (c *Client) in() {
 	}
 }
 
-func (c *Client) out() {
+func (c *Client) tx() {
 	for pk := range c.outc {
 		if err := c.rw.Encode(pk.pk); err != nil {
 			c.close(err)
@@ -325,14 +335,14 @@ func (c *Client) send(ctx context.Context, pk packet.OutgoingPacket) error {
 	o := &out{pk: pk, done: make(chan struct{})}
 	select {
 	case c.outc <- o:
-	case <-c.done:
-		return c.err
-	case <-ctx.Done():
-		return ctx.Err()
-	}
-	select {
-	case <-o.done:
-		return nil
+		select {
+		case <-o.done:
+			return nil
+		case <-c.done:
+			return c.err
+		case <-ctx.Done():
+			return ctx.Err()
+		}
 	case <-c.done:
 		return c.err
 	case <-ctx.Done():
