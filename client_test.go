@@ -2,7 +2,9 @@ package mqtt
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"testing"
@@ -10,6 +12,29 @@ import (
 
 	"github.com/amenzhinsky/mqtt/packet"
 )
+
+func TestPing(t *testing.T) {
+	c := newClient(t)
+	defer c.Close()
+
+	if _, err := c.Connect(
+		context.Background(),
+		packet.WithConnectKeepAlive(1),
+		packet.WithConnectCleanSession(true),
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	time.Sleep(500 * time.Millisecond)
+	if err := c.Ping(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+
+	time.Sleep(2 * time.Second)
+	if err := c.Ping(context.Background()); !errors.Is(err, io.EOF) {
+		t.Fatalf("want EOF on expired keep alive, got %v", err)
+	}
+}
 
 func TestPubSub(t *testing.T) {
 	pbc := make(chan *packet.Publish)
@@ -19,17 +44,15 @@ func TestPubSub(t *testing.T) {
 	defer sub.Close()
 	if _, err := sub.Connect(
 		context.Background(),
-		packet.NewConnect(
-			packet.WithConnectCleanSession(true),
-		),
+		packet.WithConnectCleanSession(true),
 	); err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err := sub.Subscribe(context.Background(), packet.NewSubscribe(
+	if _, err := sub.Subscribe(context.Background(),
 		packet.WithSubscribePacketID(1),
 		packet.WithSubscribeTopic("test/#", packet.QoS1),
-	)); err != nil {
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -37,24 +60,16 @@ func TestPubSub(t *testing.T) {
 	defer pub.Close()
 	if _, err := pub.Connect(
 		context.Background(),
-		packet.NewConnect(
-			packet.WithConnectCleanSession(true),
-		),
+		packet.WithConnectCleanSession(true),
 	); err != nil {
-		t.Fatal(err)
-	}
-
-	// TODO: separate test
-	if err := pub.Ping(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 
 	for _, qos := range []packet.QoS{packet.QoS0, packet.QoS1, packet.QoS2} {
 		if err := pub.Publish(context.Background(),
-			packet.NewPublish(fmt.Sprintf("test/%d", qos),
-				packet.WithPublishQoS(qos),
-				packet.WithPublishPayload([]byte{byte(qos)}),
-			),
+			fmt.Sprintf("test/%d", qos),
+			packet.WithPublishQoS(qos),
+			packet.WithPublishPayload([]byte{byte(qos)}),
 		); err != nil {
 			t.Fatal(err)
 		}
@@ -72,9 +87,9 @@ func TestPubSub(t *testing.T) {
 		}
 	}
 
-	if err := sub.Unsubscribe(context.Background(), packet.NewUnsubscribe(
+	if err := sub.Unsubscribe(context.Background(),
 		packet.WithUnsubscribeTopic("test/#"),
-	)); err != nil {
+	); err != nil {
 		t.Fatal(err)
 	}
 	if err := sub.Disconnect(context.Background()); err != nil {

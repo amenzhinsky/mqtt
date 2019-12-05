@@ -103,7 +103,7 @@ func connect(ctx context.Context, opts ...mqtt.Option) (*mqtt.Client, error) {
 			willTopicFlag, []byte(willPayloadFlag), packet.QoS(willQoSFlag), willRetainFlag,
 		))
 	}
-	if _, err = c.Connect(ctx, packet.NewConnect(copts...)); err != nil {
+	if _, err = c.Connect(ctx, copts...); err != nil {
 		return nil, err
 	}
 	return c, nil
@@ -150,12 +150,12 @@ Options:
 	}
 	defer c.Close()
 
-	if err := c.Publish(ctx, packet.NewPublish(fset.Arg(0),
+	if err := c.Publish(ctx, fset.Arg(0),
 		packet.WithPublishPayload(payload),
 		packet.WithPublishQoS(packet.QoS(qosFlag)),
 		packet.WithPublishRetain(retainFlag),
 		packet.WithPublishPacketID(uint16(packetIDFlag)),
-	)); err != nil {
+	); err != nil {
 		return err
 	}
 	return c.Disconnect(ctx)
@@ -198,7 +198,7 @@ func sub(ctx context.Context, connect connectFunc, argv []string) error {
 	for _, topic := range fset.Args() {
 		opts = append(opts, packet.WithSubscribeTopic(topic, packet.QoS(qosFlag)))
 	}
-	if _, err = c.Subscribe(ctx, packet.NewSubscribe(opts...)); err != nil {
+	if _, err = c.Subscribe(ctx, opts...); err != nil {
 		return err
 	}
 

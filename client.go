@@ -103,7 +103,10 @@ func (c *Client) genID() uint16 {
 	return uint16(atomic.AddUint32(&c.pkid, 1))
 }
 
-func (c *Client) Connect(ctx context.Context, connect *packet.Connect) (*packet.Connack, error) {
+func (c *Client) Connect(
+	ctx context.Context, opts ...packet.ConnectOption,
+) (*packet.Connack, error) {
+	connect := packet.NewConnect(opts...)
 	if err := c.send(ctx, connect); err != nil {
 		return nil, err
 	}
@@ -143,7 +146,10 @@ var (
 	errInvalidPacketID = errors.New("invalid packet id")
 )
 
-func (c *Client) Publish(ctx context.Context, publish *packet.Publish) error {
+func (c *Client) Publish(
+	ctx context.Context, topic string, opts ...packet.PublishOption,
+) error {
+	publish := packet.NewPublish(topic, opts...)
 	qos1 := enabled(publish.Flags, packet.PublishQoS1)
 	qos2 := enabled(publish.Flags, packet.PublishQoS2)
 	if (!qos1 && !qos2) && publish.PacketID != 0 {
@@ -203,8 +209,9 @@ func enabled(flags packet.Flags, flag uint8) bool {
 }
 
 func (c *Client) Subscribe(
-	ctx context.Context, subscribe *packet.Subscribe,
+	ctx context.Context, opts ...packet.SubscribeOption,
 ) (*packet.Suback, error) {
+	subscribe := packet.NewSubscribe(opts...)
 	if subscribe.PacketID == 0 {
 		subscribe.PacketID = c.genID()
 	}
@@ -224,7 +231,10 @@ func (c *Client) Subscribe(
 	}
 }
 
-func (c *Client) Unsubscribe(ctx context.Context, unsubscribe *packet.Unsubscribe) error {
+func (c *Client) Unsubscribe(
+	ctx context.Context, opts ...packet.UnsubscribeOption,
+) error {
+	unsubscribe := packet.NewUnsubscribe(opts...)
 	if unsubscribe.PacketID == 0 {
 		unsubscribe.PacketID = c.genID()
 	}

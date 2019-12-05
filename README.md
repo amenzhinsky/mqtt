@@ -22,25 +22,24 @@ client := mqtt.New(conn, mqtt.WithMessagesHandler(func(pk *packet.Publish) {
 }))
 defer client.Close()
 
-if _, err := client.Connect(context.Background(), packet.NewConnect(
+if _, err := client.Connect(context.Background(),
 	packet.WithConnectCleanSession(true),
 	packet.WithConnectWill("/dev/online", []byte{0}, packet.QoS1, true),
-)); err != nil {
+); err != nil {
 	return err
 }
 
-if _, err := client.Subscribe(context.Background(), packet.NewSubscribe(
-	packet.WithSubscribePacketID(1),
+if _, err := client.Subscribe(context.Background(),
 	packet.WithSubscribeTopic("/dev/cmd/#", packet.QoS1),
-)); err != nil {
+); err != nil {
 	return err
 }
 
-if err := client.Publish(context.Background(), packet.NewPublish(
+if err := client.Publish(context.Background(),
 	"/dev/online",
 	packet.WithPublishQoS(packet.QoS1),
 	packet.WithPublishPayload([]byte{1}),
-)); err != nil {
+); err != nil {
 	return err
 }
 
