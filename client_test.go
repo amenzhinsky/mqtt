@@ -50,7 +50,7 @@ func TestPubSub(t *testing.T) {
 	}
 
 	if _, err := sub.Subscribe(context.Background(),
-		packet.WithSubscribePacketID(1),
+		packet.WithSubscribePacketID(666),
 		packet.WithSubscribeTopic("test/#", packet.QoS1),
 	); err != nil {
 		t.Fatal(err)
@@ -104,7 +104,7 @@ func newClient(t *testing.T, opts ...Option) *Client {
 	t.Helper()
 	addr := os.Getenv("TEST_MQTT_ADDR")
 	if addr == "" {
-		t.Errorf("TEST_MQTT_ADDR is empty")
+		addr = ":1883"
 	}
 	conn, err := net.Dial("tcp", addr)
 	if err != nil {

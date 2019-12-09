@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sync"
 	"sync/atomic"
 
 	"github.com/amenzhinsky/mqtt/packet"
@@ -70,6 +71,7 @@ func New(rw io.ReadWriteCloser, opts ...Option) *Client {
 }
 
 type Client struct {
+	mu sync.Mutex
 	rw *encoderDecoder
 
 	pkid    uint32
@@ -113,7 +115,8 @@ func (c *Client) Connect(
 	select {
 	case connack := <-c.connackc:
 		if connack.ReturnCode != packet.ConnectionAccepted {
-			return nil, fmt.Errorf("connection failed: %s", connack.ReturnCode.String())
+			return nil, fmt.Errorf("connection failed: %s (%d)",
+				connack.ReturnCode.String(), connack.ReturnCode)
 		}
 		return connack, nil
 	case <-c.done:
@@ -142,7 +145,6 @@ func (c *Client) Disconnect(ctx context.Context) error {
 }
 
 var (
-	errNonZeroPacketID = errors.New("packet id is not zero")
 	errInvalidPacketID = errors.New("invalid packet id")
 )
 
@@ -153,7 +155,7 @@ func (c *Client) Publish(
 	qos1 := enabled(publish.Flags, packet.PublishQoS1)
 	qos2 := enabled(publish.Flags, packet.PublishQoS2)
 	if (!qos1 && !qos2) && publish.PacketID != 0 {
-		return errNonZeroPacketID
+		return errors.New("non-zero packet-id for QoS0")
 	} else if (qos1 || qos2) && publish.PacketID == 0 {
 		publish.PacketID = c.genID()
 	}
