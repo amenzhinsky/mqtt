@@ -4,7 +4,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"log"
 	"net"
 	"os"
 	"os/signal"
@@ -86,11 +85,19 @@ func connect(ctx context.Context, opts ...mqtt.Option) (*mqtt.Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	c := mqtt.New(conn, append([]mqtt.Option{
-		mqtt.WithWarnLogger(log.New(os.Stderr, "W ", 0)),
-		mqtt.WithDebugLogger(log.New(os.Stderr, "D ", 0)),
-	}, opts...)...)
 
+	if debugFlag {
+		opts = append(opts,
+			mqtt.WithIncomingInterceptor(func(pk packet.IncomingPacket) {
+				fmt.Fprintf(os.Stderr, "< %s\n", pk)
+			}),
+			mqtt.WithOutgoingInterceptor(func(pk packet.OutgoingPacket) {
+				fmt.Fprintf(os.Stderr, "> %s\n", pk)
+			}),
+		)
+	}
+
+	c := mqtt.New(conn, opts...)
 	copts := []packet.ConnectOption{
 		packet.WithConnectCleanSession(cleanSessionFlag),
 		packet.WithConnectClientID(clientIDFlag),

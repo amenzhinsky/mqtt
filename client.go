@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"sync"
 	"sync/atomic"
 
@@ -14,15 +15,25 @@ import (
 // Option is a client configuration option.
 type Option func(c *Client)
 
-func WithWarnLogger(logger Logger) Option {
+func WithLogger(logger Logger) Option {
 	return func(c *Client) {
-		c.warn = logger
+		c.logger = logger
 	}
 }
 
-func WithDebugLogger(logger Logger) Option {
+type IncomingInterceptor func(pk packet.IncomingPacket)
+
+type OutgoingInterceptor func(pk packet.OutgoingPacket)
+
+func WithIncomingInterceptor(interceptor IncomingInterceptor) Option {
 	return func(c *Client) {
-		c.debug = logger
+		c.inInt = interceptor
+	}
+}
+
+func WithOutgoingInterceptor(interceptor OutgoingInterceptor) Option {
+	return func(c *Client) {
+		c.outInt = interceptor
 	}
 }
 
@@ -51,8 +62,9 @@ func New(rw io.ReadWriteCloser, opts ...Option) *Client {
 	c := &Client{
 		rw: newEncoderDecoder(rw),
 
-		outc: make(chan *out),
-		done: make(chan struct{}),
+		logger: &stdLogger{},
+		outc:   make(chan *out),
+		done:   make(chan struct{}),
 
 		connackc:  make(chan *packet.Connack),
 		pingrespc: make(chan *packet.Pingresp),
@@ -79,9 +91,9 @@ type Client struct {
 	done    chan struct{}
 	err     error
 	handler MessagesHandler
-
-	warn  Logger
-	debug Logger
+	logger  Logger
+	inInt   IncomingInterceptor
+	outInt  OutgoingInterceptor
 
 	connackc  chan *packet.Connack
 	pingrespc chan *packet.Pingresp
@@ -98,7 +110,13 @@ type out struct {
 }
 
 type Logger interface {
-	Print(v ...interface{})
+	Output(calldepth int, s string) error
+}
+
+type stdLogger struct{}
+
+func (*stdLogger) Output(calldepth int, s string) error {
+	return log.Output(calldepth+1, "[mqtt] "+s) // +1 for this function
 }
 
 func (c *Client) genID() uint16 {
@@ -263,61 +281,63 @@ func (c *Client) rx() {
 			c.close(err)
 			return
 		}
-		c.debugf("< %s", pk)
+		if c.inInt != nil {
+			c.inInt(pk)
+		}
 		switch v := pk.(type) {
 		case *packet.Connack:
 			select {
 			case c.connackc <- v:
 			case <-c.done:
 			default:
-				c.warnf("unexpected: %s", v)
+				c.logf("unexpected: %s", v)
 			}
 		case *packet.Pingresp:
 			select {
 			case c.pingrespc <- v:
 			case <-c.done:
-				c.warnf("unexpected: %s", v)
+				c.logf("unexpected: %s", v)
 			}
 		case *packet.Puback:
 			select {
 			case c.pubackc <- v:
 			case <-c.done:
 			default:
-				c.warnf("unexpected: %s", v)
+				c.logf("unexpected: %s", v)
 			}
 		case *packet.Pubrec:
 			select {
 			case c.pubrecc <- v:
 			case <-c.done:
 			default:
-				c.warnf("unexpected: %s", v)
+				c.logf("unexpected: %s", v)
 			}
 		case *packet.Pubcomp:
 			select {
 			case c.pubcompc <- v:
 			case <-c.done:
 			default:
-				c.warnf("unexpected: %s", v)
+				c.logf("unexpected: %s", v)
 			}
 		case *packet.Suback:
 			select {
 			case c.subackc <- v:
 			case <-c.done:
 			default:
-				c.warnf("unexpected: %s", v)
+				c.logf("unexpected: %s", v)
 			}
 		case *packet.Unsuback:
 			select {
 			case c.unsubackc <- v:
 			case <-c.done:
 			default:
-				c.warnf("unexpected: %s", v)
+				c.logf("unexpected: %s", v)
 			}
 		case *packet.Publish:
 			if c.handler != nil {
 				c.handler(v)
 			} else {
-				c.warnf("unhandled: %s", v)
+				c.logf("unhandled: %s", v)
 			}
 		default:
 			panic(fmt.Sprintf("unknown incomming packet: %#v", v))
@@ -327,24 +347,20 @@ func (c *Client) rx() {
 
 func (c *Client) tx() {
 	for pk := range c.outc {
+		if c.outInt != nil {
+			c.outInt(pk.pk)
+		}
 		if err := c.rw.Encode(pk.pk); err != nil {
 			c.close(err)
 			return
 		}
-		c.debugf("> %s", pk.pk)
 		close(pk.done)
 	}
 }
 
-func (c *Client) warnf(format string, v ...interface{}) {
-	if c.warn != nil {
-		c.warn.Print(fmt.Sprintf(format, v...))
-	}
-}
-
-func (c *Client) debugf(format string, v ...interface{}) {
-	if c.debug != nil {
-		c.debug.Print(fmt.Sprintf(format, v...))
+func (c *Client) logf(format string, v ...interface{}) {
+	if c.logger != nil {
+		_ = c.logger.Output(2, fmt.Sprintf(format, v...))
 	}
 }
 
