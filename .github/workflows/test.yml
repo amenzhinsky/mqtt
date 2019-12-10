@@ -28,5 +28,4 @@ jobs:
       - name: Run unit tests
         run: go test -v -cover -race
         env:
-          CGO_ENABLED: 0
           TEST_MQTT_ADDR: 127.0.0.1:${{ job.services.mosquitto.ports['1883'] }}
